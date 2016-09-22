@@ -8,7 +8,7 @@ $ make
 ```
 To test it out with a PNG:
 ```
-./convert2h texture.png
+$ ./convert2h texture.png
 ```
 
 ## Dependencies
