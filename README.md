@@ -15,5 +15,5 @@ $ ./png2c full_screen_image.png -f
 ## Dependencies
 *CImg did not support transparency. The current version dropped CImg in favor of [libPNG](http://www.libpng.org/pub/png/libpng.html)*
 
-* [libPNG]
+* [libPNG](http://www.libpng.org/pub/png/libpng.html)
 * [TCLAP](http://tclap.sourceforge.net/)
