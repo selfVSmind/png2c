@@ -1,27 +1,36 @@
-#define cimg_use_png
+/*
+ * Copyright 2016-2020 Jason Lambert.
+ */
 
-#include "CImg.h"
-using namespace cimg_library;
+const char *version_number = "2.0";
+ 
+#include <tclap/CmdLine.h>
+
+#include <png.h>
 
 #include <iostream>
 #include <fstream>
 #include <string>
 #include <sstream>
 #include <bitset>
+#include <math.h>
 
 using namespace std;
 
 struct rgb {
-	std::bitset<5> *r;
-	std::bitset<5> *g;
-	std::bitset<5> *b;
-	std::bitset<1> *a;
-	std::bitset<16> *sample;
+	bitset<5> *r;
+	bitset<5> *g;
+	bitset<5> *b;
+	bitset<1> *a;
+	bitset<16> *sample;
 	char *n64Format;
 };
 
 char *buffer;
 rgb *rgbValues;
+string baseFileName;
+string outputFileName;
+string inputFileName;
 
 char toHexNib(int decimal) {
 	switch(decimal) {
@@ -58,95 +67,136 @@ char toHexNib(int decimal) {
 		case 15:
 			return 'f';
 		default:
-			return 'z';
+			return (char)NULL;
 	}
 }
 
-int main(int argc, char *argv[]) {
-	if ( argc != 2 ) {
-	    // We print argv[0] assuming it is the program name
-		cout<<"usage: "<< argv[0] <<" <filename>\n";
-		return 1;
-	} // argc should be 2 for correct execution
+int x, y;
+
+int width, height;
+png_byte colorType;
+png_byte bitDepth;
+
+png_structp pngPointer;
+png_infop infoPointer;
+int number_of_passes;
+png_bytep * row_pointers;
+
+void readInputPngFile(char* fileName)
+{
+	char fileHeader[8];    // 8 is the maximum size that can be checked
+
+	// open file
+	FILE *inputFilePointer = fopen(fileName, "rb");
+	if (!inputFilePointer) {
+		cout << fileName << " could not be opened." << endl;
+		cout << "Exiting." << endl;
+		exit(EXIT_FAILURE);
+	}
+
+	// check if png
+	fread(fileHeader, 1, 8, inputFilePointer);
+	if (png_sig_cmp((png_const_bytep)fileHeader, 0, 8)) {
+		cout << fileName << " is not a PNG." << endl;
+		cout << "Exiting." << endl;
+		exit(EXIT_FAILURE);
+	}
 
 
-	//ifstream inputFile("brick.ppm", ios::in | ios::binary);
+	// initialize libPNG and prepare for file reading
+	pngPointer = png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
+	infoPointer = png_create_info_struct(pngPointer);
+	png_init_io(pngPointer, inputFilePointer);
+	png_set_sig_bytes(pngPointer, 8);
 
-	ofstream debugFile("debug.txt", ios::out);
+	png_read_info(pngPointer, infoPointer);
 
+	width = png_get_image_width(pngPointer, infoPointer);
+	height = png_get_image_height(pngPointer, infoPointer);
+	colorType = png_get_color_type(pngPointer, infoPointer);
+	bitDepth = png_get_bit_depth(pngPointer, infoPointer);
 
+	number_of_passes = png_set_interlace_handling(pngPointer);
+	png_read_update_info(pngPointer, infoPointer);
 
-	CImg<unsigned char> texture(argv[1]);
-	int width = texture.width();
-	int height = texture.height();
-	int maxval = texture.max();
-	int numBytes;
-//	int width, height, numBytes;
-//	double maxval;
+	// read in the png file
+	row_pointers = (png_bytep*) malloc(sizeof(png_bytep) * height);
+	for (y = 0; y < height; y++) {
+		row_pointers[y] = (png_byte*) malloc(png_get_rowbytes(pngPointer, infoPointer));
+	}
+
+	png_read_image(pngPointer, row_pointers);
+
+	fclose(inputFilePointer);
+}
+
+void helper(ofstream *outputFile, int subHeight, int subWidth, int originY, int originX) {
+	*outputFile << "static Gfx " + baseFileName << "_" << originY << "_" << originX << "_C_dummy_aligner[] = { gsSPEndDisplayList() };" << endl;
+	*outputFile << "static unsigned short " + baseFileName << "_" << originY << "_" << originX << "[] = {" << endl;
+
+	for(int iHeight = originY; iHeight < originY+subHeight; ++iHeight) {
+		if(iHeight > originY) *outputFile << ", " << endl;
+		*outputFile << "\t";
+		for(int jWidth = originX; jWidth < originX+subWidth; ++jWidth) {
+			if(jWidth > originX) *outputFile << ", ";
+			int rgbValuesPosition = iHeight*width + jWidth;
+			*outputFile << "0x";
+			*outputFile << rgbValues[rgbValuesPosition].n64Format[0];
+			*outputFile << rgbValues[rgbValuesPosition].n64Format[1];
+			*outputFile << rgbValues[rgbValuesPosition].n64Format[2];
+			*outputFile << rgbValues[rgbValuesPosition].n64Format[3];
+		}
+	}
+	*outputFile << endl << "};\n" << endl;
+}
+
+void convertPixelData(char* fileName)
+{
+	// does the input image has an alpha channel
+	bool has_alpha = true;
 	
-	//grabbing the 'P6' (hopefully)
-	//inputFile >> current;
-	//cout << current;
-	//inputFile >> current;
-	//cout << current << endl;
+	if (png_get_color_type(pngPointer, infoPointer) == PNG_COLOR_TYPE_RGB) {
+		cout << "No alpha channel in image." << endl;
+		has_alpha = false;
+	} else {
+		cout << "There is an alpha channel in the image." << endl;
+	}
 
-	//grab the width
-	//inputFile >> width;
-	cout << "Width = " << width << endl;
-	
-	//grab the height
-	//inputFile >> height;
-	cout << "Height = " << height << endl;
 
-	//grab the maximum color value
-	//inputFile >> maxval;
-	cout << "The maximum color value = " << maxval << endl;
-	
-	//the number of bytes per sample
-	numBytes = (maxval > 255) ? 2 : 1;
-	
-	//w x h x (rgb) x (how large of a sample)
-	int sizeOfBuffer = width*height*3*numBytes;
-	
-	//advance past the whitespace character after MAXVAL
-	//inputFile.ignore();
-
-	//allocate some buffer space and read from the file
-	buffer = new char[sizeOfBuffer];
-	//inputFile.read(buffer, sizeOfBuffer);
-	
-	//close the input file
-	//inputFile.close();
-
-	//allocate rgbValues array
+	// allocate rgbValues array
 	int rgbValuesSize = width*height;
 	rgbValues = new rgb[rgbValuesSize];
 
-	//fill up the rgbValues array
-	//WARNING: this logic only handles cases where (maxval<255) !!
+	// fill up the rgbValues array
 	for(int iHeight = 0; iHeight < height; ++iHeight) {
-		for(int jWidth = 0; jWidth < width*3; jWidth +=3) {
-			//unused variable     int bufferPosition = iHeight*width*3 + jWidth;
-			int rgbValuesPosition = iHeight*width + jWidth/3;
+		png_byte* row = row_pointers[iHeight];
+		for (int jWidth = 0; jWidth < width; jWidth++) {
+			png_byte* ptr = has_alpha ? &(row[jWidth*4]) : &(row[jWidth*3]);
+			int rgbValuesPosition = iHeight*width + jWidth;
+			int maxval = pow(2, bitDepth);
 			int max8BitValue = 31;
 
 			//first the red
-			double colorValue = texture(jWidth/3, iHeight, 0, 0);
+			double colorValue = ptr[0];
 			double calculatedValue = (colorValue/maxval)*max8BitValue;
-			rgbValues[rgbValuesPosition].r = new bitset<5>((int)calculatedValue);
+			rgbValues[rgbValuesPosition].r = new bitset<5>(calculatedValue);
 			
 			//now for the green
-			colorValue = texture(jWidth/3, iHeight, 0, 1);
+			colorValue = ptr[1];		
 			calculatedValue = (colorValue/maxval)*max8BitValue;
-			rgbValues[rgbValuesPosition].g = new bitset<5>((int)calculatedValue);
+			rgbValues[rgbValuesPosition].g = new bitset<5>(calculatedValue);
 			
 			//and, finally, the blue
-			colorValue = texture(jWidth/3, iHeight, 0, 2);
+			colorValue = ptr[2];		
 			calculatedValue = (colorValue/maxval)*max8BitValue;
-			rgbValues[rgbValuesPosition].b = new bitset<5>((int)calculatedValue);
+			rgbValues[rgbValuesPosition].b = new bitset<5>(calculatedValue);
 
 			//OH! don't forget the alpha
-			rgbValues[rgbValuesPosition].a = new bitset<1>(1);
+			if(has_alpha) {
+				rgbValues[rgbValuesPosition].a = ptr[3] == 255? new bitset<1>(1) : new bitset<1>(0);
+			} else {
+				rgbValues[rgbValuesPosition].a = new bitset<1>(1);
+			}
 
 			//now make the sample bitset
 			string redStr = (*rgbValues[rgbValuesPosition].r).to_string();
@@ -154,7 +204,7 @@ int main(int argc, char *argv[]) {
 			string blueStr = (*rgbValues[rgbValuesPosition].b).to_string();
 			string alphaStr = (*rgbValues[rgbValuesPosition].a).to_string();
 			rgbValues[rgbValuesPosition].sample = new bitset<16>(redStr+greenStr+blueStr+alphaStr);
-			debugFile << rgbValues[rgbValuesPosition].sample << endl;
+			// if(ptr[3] == 0) rgbValues[rgbValuesPosition].sample = new bitset<16>(0xFFFE);
 
 			//now for the final steps in conversion
 			//so far we have a 16bit sample value that needs broken up into hex
@@ -170,7 +220,14 @@ int main(int argc, char *argv[]) {
 			rgbValues[rgbValuesPosition].n64Format[2] = toHexNib(third);
 			rgbValues[rgbValuesPosition].n64Format[3] = toHexNib(fourth);
 
-			//clean shit up!
+			// if(iHeight == 9) {
+				// if(jWidth == 68) {
+					// cout << ptr[0]/1 << " " << ptr[1]/1 << " " << ptr[2]/1 << " " << ptr[3]/1 << endl;
+					// cout << rgbValues[rgbValuesPosition].n64Format << endl;
+				// }
+			// }
+
+			// clean it up!
 			delete rgbValues[rgbValuesPosition].r;
 			delete rgbValues[rgbValuesPosition].g;
 			delete rgbValues[rgbValuesPosition].b;
@@ -178,52 +235,156 @@ int main(int argc, char *argv[]) {
 			delete rgbValues[rgbValuesPosition].sample;
 		}
 	}
+}
 
-	delete buffer;
+// static Vtx shade_vtx[] =  {
+    // {   -64, 64, -5, 0, 0  << 6, 0  << 6, 0xff, 0xff, 0xff, 0xff},
+    // {   64,  64, -5, 0, 32 << 6, 0  << 6, 0xff, 0xff, 0xff, 0xff},
+    // {   64, -64, -5, 0, 32 << 6, 32 << 6, 0xff, 0xff, 0xff, 0xff},
+    // {   -64,-64, -5, 0, 0  << 6, 32 << 6, 0xff, 0xff, 0xff, 0xff},
+// };
 
-	int test = 0;
-/*	cout << *rgbValues[test].r << endl;
-	cout << *rgbValues[test].g << endl;
-	cout << *rgbValues[test].b << endl;
-	cout << *rgbValues[test].a << endl;
-	cout << *rgbValues[test].sample << endl;
-*/	cout << rgbValues[test].n64Format << endl;
-
-/*	cout << ((*rgbValues[test].sample)>>12).to_ulong() << endl;
-	cout << (((*rgbValues[test].sample)<<4)>>12).to_ulong() << endl;
-	cout << (((*rgbValues[test].sample)<<8)>>12).to_ulong() << endl;
-	cout << (((*rgbValues[test].sample)<<12)>>12).to_ulong() << endl;
-*/
-
-
-	ofstream outputFile("brick.h", ios::out);
-	
-	string lineOne = "static Gfx brick_C_dummy_aligner1[] = { gsSPEndDisplayList() };";
-	string lineTwo = "unsigned short brick[] = {";
-
-	outputFile << lineOne << endl << endl << lineTwo << endl;
-	
-	//now cycle through the rgbValues array (go ahead and delete stuffz as you go along)
-	for(int iHeight = 0; iHeight < height; ++iHeight) {
-		outputFile << "\t";
-		for(int jWidth = 0; jWidth < width; ++jWidth) {
-			int rgbValuesPosition = iHeight*width + jWidth;
-			outputFile << "0x";
-			outputFile << rgbValues[rgbValuesPosition].n64Format[0];
-			outputFile << rgbValues[rgbValuesPosition].n64Format[1];
-			outputFile << rgbValues[rgbValuesPosition].n64Format[2];
-			outputFile << rgbValues[rgbValuesPosition].n64Format[3];
-			outputFile << ", ";
-			
-			//deletz
-			//delete[] rgbValues[rgbValuesPosition].n64Format;
-			//ummmmmmmm so well figure this out later?? idk
-		}
-		outputFile << endl;
+void fullScreenImage(ofstream *outputFile)
+{
+	int full_screen_height = 240, full_screen_width = 320;
+	int z_depth = -5;
+	if((height != full_screen_height) || (width != full_screen_width)) {
+		cout << "Full screen conversion requires image dimensions of 320 x 240." << endl;
+		exit(EXIT_FAILURE);
 	}
 	
-	outputFile << "};\n";
+	// we'll be breaking the image up into 32x32 pixel chunks
+	int chunk_size = 32;
+	int num_rows = (1.0 * full_screen_height)/chunk_size + 0.5, num_columns = full_screen_width/chunk_size; //fix this later.. if you feel like it
 	
-	return 0;
- }
+	// *outputFile << "static Vtx " + baseFileName << "_vtx[] = {" << endl;
+	// for(int i = 0; i < num_rows; ++i) {
+		// for(int j = 0; j < num_columns; ++j) {
+			// // *outputFile << "static Vtx " + baseFileName << "_" << i * chunk_size << "_" << j * chunk_size << "_vtx[] = {" << endl;  //original
+			// *outputFile << "\t{ " << j * chunk_size - (full_screen_width / 2) << ", " << i * chunk_size + (full_screen_height / 2) << ", " << z_depth << ", 0, 0 << 6, 0 << 6, 0, 0, 0, 0 }," << endl;
+			// *outputFile << "\t{ " << j * chunk_size + chunk_size - (full_screen_width / 2) << ", " << i * chunk_size + (full_screen_height / 2) << ", " << z_depth << ", 0, " << chunk_size << " << 6, 0 << 6, 0, 0, 0, 0 }," << endl;
+			// *outputFile << "\t{ " << j * chunk_size + chunk_size - (full_screen_width / 2) << ", " << i * chunk_size - chunk_size + (full_screen_height / 2) << ", " << z_depth << ", 0, " << chunk_size << " << 6, " << chunk_size << " << 6, 0, 0, 0, 0 }," << endl;
+			// *outputFile << "\t{ " << j * chunk_size - (full_screen_width / 2) << ", " << i * chunk_size - chunk_size + (full_screen_height / 2) << ", " << z_depth << ", 0, 0 << 6, " << chunk_size << " << 6, 0, 0, 0, 0 }," << endl;
+		// }
+	// }
+	// *outputFile << "};" << endl;
 
+	for(int i = 0; i < num_rows; ++i) {
+		for(int j = 0; j < num_columns; ++j) {
+			*outputFile << "static Vtx " + baseFileName << "_" << i * chunk_size << "_" << j * chunk_size << "_vtx[] = {" << endl;  //original
+			*outputFile << "\t{ " << j * chunk_size - (full_screen_width / 2) << ", " << 0 - 0 - i * chunk_size + (full_screen_height / 2) << ", " << z_depth << ", 0, 0 << 6, 0 << 6, 0, 0, 0, 0 }," << endl;
+			*outputFile << "\t{ " << j * chunk_size + chunk_size - (full_screen_width / 2) << ", " << 0 - i * chunk_size + (full_screen_height / 2) << ", " << z_depth << ", 0, " << chunk_size << " << 6, 0 << 6, 0, 0, 0, 0 }," << endl;
+			if(i+1 == num_rows) {
+				*outputFile << "\t{ " << j * chunk_size + chunk_size - (full_screen_width / 2) << ", " << 0 - i * chunk_size - chunk_size / 2 + (full_screen_height / 2) << ", " << z_depth << ", 0, " << chunk_size << " << 6, " << chunk_size / 2 << " << 6, 0, 0, 0, 0 }," << endl;
+				*outputFile << "\t{ " << j * chunk_size - (full_screen_width / 2) << ", " << 0 - i * chunk_size - chunk_size / 2 + (full_screen_height / 2) << ", " << z_depth << ", 0, 0 << 6, " << chunk_size / 2 << " << 6, 0, 0, 0, 0 }" << endl;
+			} else {
+				*outputFile << "\t{ " << j * chunk_size + chunk_size - (full_screen_width / 2) << ", " << 0 - i * chunk_size - chunk_size + (full_screen_height / 2) << ", " << z_depth << ", 0, " << chunk_size << " << 6, " << chunk_size << " << 6, 0, 0, 0, 0 }," << endl;
+				*outputFile << "\t{ " << j * chunk_size - (full_screen_width / 2) << ", " << 0 - i * chunk_size - chunk_size + (full_screen_height / 2) << ", " << z_depth << ", 0, 0 << 6, " << chunk_size << " << 6, 0, 0, 0, 0 }" << endl;
+			}
+			*outputFile << "};" << endl << endl;
+		}
+	}
+	*outputFile << "static Vtx *" + baseFileName << "_vtx[" << num_columns * num_rows << "] = {" << endl;
+	for(int i = 0; i < num_rows; ++i) {
+		for(int j = 0; j < num_columns; ++j) {
+			*outputFile << "\t" + baseFileName << "_" << i * chunk_size << "_" << j * chunk_size << "_vtx," << endl;
+		}
+	}
+	*outputFile << "};" << endl;
+
+	// *outputFile << "static Vtx *" + baseFileName << "_vtx[" << num_columns * num_rows << "] = {" << endl;
+	// for(int i = 0; i < num_rows; ++i) {
+		// for(int j = 0; j < num_columns; ++j) {
+			// // *outputFile << "static Vtx " + baseFileName << "_" << i * chunk_size << "_" << j * chunk_size << "_vtx[] = {" << endl;  //original
+			// *outputFile << "\t(Vtx []){" << endl;
+			// *outputFile << "\t\t{ " << j * chunk_size - (full_screen_width / 2) << ", " << i * chunk_size + (full_screen_height / 2) << ", " << z_depth << ", 0, 0 << 6, 0 << 6, 0, 0, 0, 0 }," << endl;
+			// *outputFile << "\t\t{ " << j * chunk_size + chunk_size - (full_screen_width / 2) << ", " << i * chunk_size + (full_screen_height / 2) << ", " << z_depth << ", 0, " << chunk_size << " << 6, 0 << 6, 0, 0, 0, 0 }," << endl;
+			// *outputFile << "\t\t{ " << j * chunk_size + chunk_size - (full_screen_width / 2) << ", " << i * chunk_size - chunk_size + (full_screen_height / 2) << ", " << z_depth << ", 0, " << chunk_size << " << 6, " << chunk_size << " << 6, 0, 0, 0, 0 }," << endl;
+			// *outputFile << "\t\t{ " << j * chunk_size - (full_screen_width / 2) << ", " << i * chunk_size - chunk_size + (full_screen_height / 2) << ", " << z_depth << ", 0, 0 << 6, " << chunk_size << " << 6, 0, 0, 0, 0 }" << endl;
+			// *outputFile << "\t}," << endl;
+		// }
+	// }
+	// *outputFile << "};" << endl;
+	for(int i = 0; i < num_rows; ++i) {
+		for(int j = 0; j < num_columns; ++j) {
+			helper(outputFile, (i+1 == num_rows) ? chunk_size/2 : chunk_size, chunk_size, i * chunk_size, j * chunk_size);
+		}
+	}
+
+	*outputFile << "static unsigned short *" + baseFileName << "_tex[" << num_columns * num_rows << "] = {" << endl;
+	for(int i = 0; i < num_rows; ++i) {
+		for(int j = 0; j < num_columns; ++j) {
+			*outputFile << "\t" + baseFileName << "_" << i * chunk_size << "_" << j * chunk_size << "," << endl;
+		}
+	}
+	*outputFile << "};" << endl;
+}
+
+// this function sets up all of our command line arguments
+// it utilizes the TCLAP library
+bool setupTclap(int argc, char **argv) {
+	bool fullRes = false;
+	try {  
+		TCLAP::CmdLine cmd("Get 'N Or Get Out", ' ',version_number);
+
+		TCLAP::SwitchArg fullResSwitch("f","fullres","Generate data for full screen background.", cmd, false);
+
+		TCLAP::ValueArg<std::string> outObjectArg("o","outfile","Name of output bitmap.",false,"","string");
+		cmd.add( outObjectArg );
+
+		TCLAP::UnlabeledValueArg<std::string>  inFile("in","","","","string");
+		cmd.add( inFile );
+		
+		cmd.parse( argc, argv );
+		outputFileName = outObjectArg.getValue();
+		inputFileName = inFile.getValue();
+
+		fullRes = fullResSwitch.getValue();
+
+	} catch (TCLAP::ArgException &e)  // catch any exceptions
+	{ std::cerr << "error: " << e.error() << " for arg " << e.argId() << std::endl; }
+
+	return fullRes;
+}
+
+int main(int argc, char **argv)
+{
+	bool fullRes = setupTclap(argc, argv);
+
+	// remove path and extension from file name
+	string temporaryInputFileNameStringObject(inputFileName);
+	size_t lastindex = temporaryInputFileNameStringObject.find_last_of("."); 
+	baseFileName = temporaryInputFileNameStringObject.substr(0, lastindex); 
+
+	readInputPngFile(argv[1]);
+	convertPixelData(argv[2]);
+
+	// generate a name for the output file if it isn't supplied
+	char *outName;
+	if(outputFileName == "") {
+		outName = (char*)(baseFileName + ".h").c_str();
+	} else {
+		outName = (char*)outputFileName.c_str();
+	}
+
+	// prepare the output file for writing
+	ofstream outputFile(outName, ios::out);
+	
+	outputFile << "/* Height " << height << " */" << endl;
+	outputFile << "/* Width " << width << " */" << endl;
+	outputFile << endl << endl;
+	
+	// string lineOne = "static Gfx " + baseFileName + "_C_dummy_aligner1[] = { gsSPEndDisplayList() };";
+	// string lineTwo = "unsigned short " + baseFileName + "[] = {";
+	// outputFile << lineOne << endl << endl << lineTwo << endl;
+	
+	//now cycle through the rgbValues array and print to file
+
+	if(fullRes)	fullScreenImage(&outputFile);
+	
+	delete[] rgbValues;
+	
+	outputFile.close();
+
+	return 0;
+}
