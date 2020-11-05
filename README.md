@@ -13,3 +13,4 @@ $ ./convert2h texture.png
 
 ## Dependencies
 * [CImg](http://cimg.eu/)
+*CImg does not support transparency. The upcoming version 2 will no longer utilize the CImg library.*
