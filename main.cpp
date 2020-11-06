@@ -292,11 +292,23 @@ bool setupTclap(int argc, char **argv) {
 	return fullRes;
 }
 
+void writeOutputFileHeader(ofstream &outputFile, bool fullRes) {
+	outputFile << "/* Width " << myLibPngHelper.width << " */" << endl;
+	outputFile << "/* Height " << myLibPngHelper.height << " */" << endl;
+	if(fullRes) {
+		outputFile << endl << "/*" << endl;
+		outputFile << "\tThis file represents a large image designed to fill the entire screen." << endl;
+		outputFile << "\tAs such, it has been broken up into smaller pieces and the required vertex data is also included." << endl;
+		outputFile << "*/" << endl;
+	}
+	outputFile << endl << endl;
+}
+
 int main(int argc, char **argv)
 {
 	bool fullRes = setupTclap(argc, argv);
 
-	// remove path
+	// remove path from filename
 	string temporaryInputFileNameStringObject(inputFileName);
 	size_t splitterIndex = temporaryInputFileNameStringObject.find_last_of("/\\");
 	temporaryInputFileNameStringObject = temporaryInputFileNameStringObject.substr(splitterIndex+1);
@@ -305,12 +317,15 @@ int main(int argc, char **argv)
 	size_t lastindex = temporaryInputFileNameStringObject.find_last_of("."); 
 	baseFileName = temporaryInputFileNameStringObject.substr(0, lastindex); 
 
+
+	// try to read the png into memory
 	string error = myLibPngHelper.readInputPngFile((char*)inputFileName.c_str());
 	if(error != "") {
 		cout << error << endl;
-		exit(EXIT_FAILURE);
+		return 0;
 	}
 
+	// that worked, so convert the pixels into the 5/5/5/1 format
 	convertPixelData();
 
 	// generate a name for the output file if it isn't supplied
@@ -324,10 +339,9 @@ int main(int argc, char **argv)
 	// prepare the output file for writing
 	ofstream outputFile(outName, ios::out);
 	
-	outputFile << "/* Height " << myLibPngHelper.height << " */" << endl;
-	outputFile << "/* Width " << myLibPngHelper.width << " */" << endl;
-	outputFile << endl << endl;
-	
+	// put some useful information at the top
+	writeOutputFileHeader(outputFile, fullRes);
+
 	// string lineOne = "static Gfx " + baseFileName + "_C_dummy_aligner1[] = { gsSPEndDisplayList() };";
 	// string lineTwo = "unsigned short " + baseFileName + "[] = {";
 	// outputFile << lineOne << endl << endl << lineTwo << endl;
@@ -339,6 +353,8 @@ int main(int argc, char **argv)
 	delete[] rgbValues;
 	
 	outputFile.close();
+
+	cout << "Success! (probably)" << endl;
 
 	return 0;
 }
