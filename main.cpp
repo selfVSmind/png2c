@@ -72,15 +72,14 @@ char toHexNib(int decimal) {
 }
 
 int x, y;
-
 int width, height;
+
 png_byte colorType;
 png_byte bitDepth;
-
 png_structp pngPointer;
 png_infop infoPointer;
-int number_of_passes;
 png_bytep * row_pointers;
+int number_of_passes;
 
 void readInputPngFile(char* fileName)
 {
@@ -150,14 +149,14 @@ void helper(ofstream *outputFile, int subHeight, int subWidth, int originY, int 
 	*outputFile << endl << "};\n" << endl;
 }
 
-void convertPixelData(char* fileName)
+void convertPixelData()
 {
 	// does the input image has an alpha channel
-	bool has_alpha = true;
+	bool hasAlpha = true;
 	
 	if (png_get_color_type(pngPointer, infoPointer) == PNG_COLOR_TYPE_RGB) {
 		cout << "No alpha channel in image." << endl;
-		has_alpha = false;
+		hasAlpha = false;
 	} else {
 		cout << "There is an alpha channel in the image." << endl;
 	}
@@ -171,7 +170,7 @@ void convertPixelData(char* fileName)
 	for(int iHeight = 0; iHeight < height; ++iHeight) {
 		png_byte* row = row_pointers[iHeight];
 		for (int jWidth = 0; jWidth < width; jWidth++) {
-			png_byte* ptr = has_alpha ? &(row[jWidth*4]) : &(row[jWidth*3]);
+			png_byte* ptr = hasAlpha ? &(row[jWidth*4]) : &(row[jWidth*3]);
 			int rgbValuesPosition = iHeight*width + jWidth;
 			int maxval = pow(2, bitDepth);
 			int max8BitValue = 31;
@@ -181,24 +180,24 @@ void convertPixelData(char* fileName)
 			double calculatedValue = (colorValue/maxval)*max8BitValue;
 			rgbValues[rgbValuesPosition].r = new bitset<5>(calculatedValue);
 			
-			//now for the green
+			// now for the green
 			colorValue = ptr[1];		
 			calculatedValue = (colorValue/maxval)*max8BitValue;
 			rgbValues[rgbValuesPosition].g = new bitset<5>(calculatedValue);
 			
-			//and, finally, the blue
+			// and, finally, the blue
 			colorValue = ptr[2];		
 			calculatedValue = (colorValue/maxval)*max8BitValue;
 			rgbValues[rgbValuesPosition].b = new bitset<5>(calculatedValue);
 
-			//OH! don't forget the alpha
-			if(has_alpha) {
+			// OH! don't forget the alpha
+			if(hasAlpha) {
 				rgbValues[rgbValuesPosition].a = ptr[3] == 255? new bitset<1>(1) : new bitset<1>(0);
 			} else {
 				rgbValues[rgbValuesPosition].a = new bitset<1>(1);
 			}
 
-			//now make the sample bitset
+			// now make the sample bitset
 			string redStr = (*rgbValues[rgbValuesPosition].r).to_string();
 			string greenStr = (*rgbValues[rgbValuesPosition].g).to_string();
 			string blueStr = (*rgbValues[rgbValuesPosition].b).to_string();
@@ -206,8 +205,8 @@ void convertPixelData(char* fileName)
 			rgbValues[rgbValuesPosition].sample = new bitset<16>(redStr+greenStr+blueStr+alphaStr);
 			// if(ptr[3] == 0) rgbValues[rgbValuesPosition].sample = new bitset<16>(0xFFFE);
 
-			//now for the final steps in conversion
-			//so far we have a 16bit sample value that needs broken up into hex
+			// now for the final steps in conversion
+			// so far we have a 16bit sample value that needs broken up into hex
 			int first, second, third, fourth;
 			first = ((*rgbValues[rgbValuesPosition].sample)>>12).to_ulong();
 			second = (((*rgbValues[rgbValuesPosition].sample)<<4)>>12).to_ulong();
@@ -351,13 +350,18 @@ int main(int argc, char **argv)
 {
 	bool fullRes = setupTclap(argc, argv);
 
-	// remove path and extension from file name
+	// remove path
 	string temporaryInputFileNameStringObject(inputFileName);
+	size_t splitterIndex = temporaryInputFileNameStringObject.find_last_of("/\\");
+	temporaryInputFileNameStringObject = temporaryInputFileNameStringObject.substr(splitterIndex+1);
+
+	// remove extension
 	size_t lastindex = temporaryInputFileNameStringObject.find_last_of("."); 
+	cout << lastindex << endl;
 	baseFileName = temporaryInputFileNameStringObject.substr(0, lastindex); 
 
-	readInputPngFile(argv[1]);
-	convertPixelData(argv[2]);
+	readInputPngFile((char*)inputFileName.c_str());
+	convertPixelData();
 
 	// generate a name for the output file if it isn't supplied
 	char *outName;
