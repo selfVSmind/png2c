@@ -3,8 +3,12 @@
  */
 
 const char *version_number = "2.0";
- 
+
+// fancy command line argument parser 
 #include <tclap/CmdLine.h>
+
+// my classes
+#include "LibPngHelper.h"
 
 #include <iostream>
 #include <fstream>
@@ -12,8 +16,6 @@ const char *version_number = "2.0";
 #include <sstream>
 #include <bitset>
 #include <math.h>
-
-#include "LibPngHelper.h"
 
 using namespace std;
 
@@ -72,10 +74,6 @@ char toHexNib(int decimal) {
 			return (char)NULL;
 	}
 }
-
-int x, y;
-
-
 
 void helper(ofstream *outputFile, int subHeight, int subWidth, int originY, int originX) {
 	*outputFile << "static Gfx " + baseFileName << "_" << originY << "_" << originX << "_C_dummy_aligner[] = { gsSPEndDisplayList() };" << endl;
@@ -312,7 +310,7 @@ int main(int argc, char **argv)
 		cout << error << endl;
 		exit(EXIT_FAILURE);
 	}
-	
+
 	convertPixelData();
 
 	// generate a name for the output file if it isn't supplied

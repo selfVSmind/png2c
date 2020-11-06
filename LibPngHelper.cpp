@@ -49,7 +49,6 @@ string LibPngHelper::readInputPngFile(char* fileName)
 	}
 
 	png_read_image(pngPointer, row_pointers);
-
 	fclose(inputFilePointer);
 
     return "";
