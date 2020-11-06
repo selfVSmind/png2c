@@ -3,3 +3,6 @@ build/
 
 # Visual Studio Code settings directory
 .vscode/
+
+# Compiled Object Files
+*.o

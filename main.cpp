@@ -6,14 +6,14 @@ const char *version_number = "2.0";
  
 #include <tclap/CmdLine.h>
 
-#include <png.h>
-
 #include <iostream>
 #include <fstream>
 #include <string>
 #include <sstream>
 #include <bitset>
 #include <math.h>
+
+#include "LibPngHelper.h"
 
 using namespace std;
 
@@ -31,6 +31,8 @@ rgb *rgbValues;
 string baseFileName;
 string outputFileName;
 string inputFileName;
+
+LibPngHelper myLibPngHelper = LibPngHelper();
 
 char toHexNib(int decimal) {
 	switch(decimal) {
@@ -72,62 +74,8 @@ char toHexNib(int decimal) {
 }
 
 int x, y;
-int width, height;
-
-png_byte colorType;
-png_byte bitDepth;
-png_structp pngPointer;
-png_infop infoPointer;
-png_bytep * row_pointers;
-int number_of_passes;
-
-void readInputPngFile(char* fileName)
-{
-	char fileHeader[8];    // 8 is the maximum size that can be checked
-
-	// open file
-	FILE *inputFilePointer = fopen(fileName, "rb");
-	if (!inputFilePointer) {
-		cout << fileName << " could not be opened." << endl;
-		cout << "Exiting." << endl;
-		exit(EXIT_FAILURE);
-	}
-
-	// check if png
-	fread(fileHeader, 1, 8, inputFilePointer);
-	if (png_sig_cmp((png_const_bytep)fileHeader, 0, 8)) {
-		cout << fileName << " is not a PNG." << endl;
-		cout << "Exiting." << endl;
-		exit(EXIT_FAILURE);
-	}
 
 
-	// initialize libPNG and prepare for file reading
-	pngPointer = png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
-	infoPointer = png_create_info_struct(pngPointer);
-	png_init_io(pngPointer, inputFilePointer);
-	png_set_sig_bytes(pngPointer, 8);
-
-	png_read_info(pngPointer, infoPointer);
-
-	width = png_get_image_width(pngPointer, infoPointer);
-	height = png_get_image_height(pngPointer, infoPointer);
-	colorType = png_get_color_type(pngPointer, infoPointer);
-	bitDepth = png_get_bit_depth(pngPointer, infoPointer);
-
-	number_of_passes = png_set_interlace_handling(pngPointer);
-	png_read_update_info(pngPointer, infoPointer);
-
-	// read in the png file
-	row_pointers = (png_bytep*) malloc(sizeof(png_bytep) * height);
-	for (y = 0; y < height; y++) {
-		row_pointers[y] = (png_byte*) malloc(png_get_rowbytes(pngPointer, infoPointer));
-	}
-
-	png_read_image(pngPointer, row_pointers);
-
-	fclose(inputFilePointer);
-}
 
 void helper(ofstream *outputFile, int subHeight, int subWidth, int originY, int originX) {
 	*outputFile << "static Gfx " + baseFileName << "_" << originY << "_" << originX << "_C_dummy_aligner[] = { gsSPEndDisplayList() };" << endl;
@@ -138,7 +86,7 @@ void helper(ofstream *outputFile, int subHeight, int subWidth, int originY, int 
 		*outputFile << "\t";
 		for(int jWidth = originX; jWidth < originX+subWidth; ++jWidth) {
 			if(jWidth > originX) *outputFile << ", ";
-			int rgbValuesPosition = iHeight*width + jWidth;
+			int rgbValuesPosition = iHeight*myLibPngHelper.width + jWidth;
 			*outputFile << "0x";
 			*outputFile << rgbValues[rgbValuesPosition].n64Format[0];
 			*outputFile << rgbValues[rgbValuesPosition].n64Format[1];
@@ -154,7 +102,7 @@ void convertPixelData()
 	// does the input image has an alpha channel
 	bool hasAlpha = true;
 	
-	if (png_get_color_type(pngPointer, infoPointer) == PNG_COLOR_TYPE_RGB) {
+	if (png_get_color_type(myLibPngHelper.pngPointer, myLibPngHelper.infoPointer) == PNG_COLOR_TYPE_RGB) {
 		cout << "No alpha channel in image." << endl;
 		hasAlpha = false;
 	} else {
@@ -163,16 +111,16 @@ void convertPixelData()
 
 
 	// allocate rgbValues array
-	int rgbValuesSize = width*height;
+	int rgbValuesSize = myLibPngHelper.width*myLibPngHelper.height;
 	rgbValues = new rgb[rgbValuesSize];
 
 	// fill up the rgbValues array
-	for(int iHeight = 0; iHeight < height; ++iHeight) {
-		png_byte* row = row_pointers[iHeight];
-		for (int jWidth = 0; jWidth < width; jWidth++) {
+	for(int iHeight = 0; iHeight < myLibPngHelper.height; ++iHeight) {
+		png_byte* row = myLibPngHelper.row_pointers[iHeight];
+		for (int jWidth = 0; jWidth < myLibPngHelper.width; jWidth++) {
 			png_byte* ptr = hasAlpha ? &(row[jWidth*4]) : &(row[jWidth*3]);
-			int rgbValuesPosition = iHeight*width + jWidth;
-			int maxval = pow(2, bitDepth);
+			int rgbValuesPosition = iHeight*myLibPngHelper.width + jWidth;
+			int maxval = pow(2, myLibPngHelper.bitDepth);
 			int max8BitValue = 31;
 
 			//first the red
@@ -247,7 +195,7 @@ void fullScreenImage(ofstream *outputFile)
 {
 	int full_screen_height = 240, full_screen_width = 320;
 	int z_depth = -5;
-	if((height != full_screen_height) || (width != full_screen_width)) {
+	if((myLibPngHelper.height != full_screen_height) || (myLibPngHelper.width != full_screen_width)) {
 		cout << "Full screen conversion requires image dimensions of 320 x 240." << endl;
 		exit(EXIT_FAILURE);
 	}
@@ -357,10 +305,14 @@ int main(int argc, char **argv)
 
 	// remove extension
 	size_t lastindex = temporaryInputFileNameStringObject.find_last_of("."); 
-	cout << lastindex << endl;
 	baseFileName = temporaryInputFileNameStringObject.substr(0, lastindex); 
 
-	readInputPngFile((char*)inputFileName.c_str());
+	string error = myLibPngHelper.readInputPngFile((char*)inputFileName.c_str());
+	if(error != "") {
+		cout << error << endl;
+		exit(EXIT_FAILURE);
+	}
+	
 	convertPixelData();
 
 	// generate a name for the output file if it isn't supplied
@@ -374,8 +326,8 @@ int main(int argc, char **argv)
 	// prepare the output file for writing
 	ofstream outputFile(outName, ios::out);
 	
-	outputFile << "/* Height " << height << " */" << endl;
-	outputFile << "/* Width " << width << " */" << endl;
+	outputFile << "/* Height " << myLibPngHelper.height << " */" << endl;
+	outputFile << "/* Width " << myLibPngHelper.width << " */" << endl;
 	outputFile << endl << endl;
 	
 	// string lineOne = "static Gfx " + baseFileName + "_C_dummy_aligner1[] = { gsSPEndDisplayList() };";
