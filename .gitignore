@@ -6,3 +6,6 @@ build/
 
 # Compiled Object Files
 *.o
+
+# Batch Files
+*.bat

@@ -6,7 +6,7 @@
 using namespace std;
 
 LibPngHelper::LibPngHelper() {
-    // constructer
+    // might use later
 }
 
 string LibPngHelper::readInputPngFile(char* fileName)
@@ -39,17 +39,26 @@ string LibPngHelper::readInputPngFile(char* fileName)
 	colorType = png_get_color_type(pngPointer, infoPointer);
 	bitDepth = png_get_bit_depth(pngPointer, infoPointer);
 
-	number_of_passes = png_set_interlace_handling(pngPointer);
+	numberOfPasses = png_set_interlace_handling(pngPointer);
 	png_read_update_info(pngPointer, infoPointer);
 
 	// read in the png file
-	row_pointers = (png_bytep*) malloc(sizeof(png_bytep) * height);
+	rowPointers = (png_bytep*) malloc(sizeof(png_bytep) * height);
 	for (int y = 0; y < height; y++) {
-		row_pointers[y] = (png_byte*) malloc(png_get_rowbytes(pngPointer, infoPointer));
+		rowPointers[y] = (png_byte*) malloc(png_get_rowbytes(pngPointer, infoPointer));
 	}
 
-	png_read_image(pngPointer, row_pointers);
+	png_read_image(pngPointer, rowPointers);
 	fclose(inputFilePointer);
 
     return "";
+}
+
+bool LibPngHelper::hasAlpha() {
+	if (png_get_color_type(pngPointer, infoPointer) == PNG_COLOR_TYPE_RGB) {
+		cout << "No alpha channel in image." << endl;
+		return false;
+	}
+	cout << "There is an alpha channel in the image." << endl;
+	return true;
 }

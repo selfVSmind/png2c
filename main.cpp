@@ -9,71 +9,20 @@ const char *version_number = "2.0";
 
 // my classes
 #include "LibPngHelper.h"
+#include "PixelFormatter.h"
 
 #include <iostream>
 #include <fstream>
 #include <string>
 #include <sstream>
-#include <bitset>
-#include <math.h>
 
 using namespace std;
-
-struct rgb {
-	bitset<5> *r;
-	bitset<5> *g;
-	bitset<5> *b;
-	bitset<1> *a;
-	bitset<16> *sample;
-	char *n64Format;
-};
 
 char *buffer;
 rgb *rgbValues;
 string baseFileName;
 string outputFileName;
 string inputFileName;
-
-LibPngHelper myLibPngHelper = LibPngHelper();
-
-char toHexNib(int decimal) {
-	switch(decimal) {
-		case 0:
-			return '0';
-		case 1:
-			return '1';
-		case 2:
-			return '2';
-		case 3:
-			return '3';
-		case 4:
-			return '4';
-		case 5:
-			return '5';
-		case 6:
-			return '6';
-		case 7:
-			return '7';
-		case 8:
-			return '8';
-		case 9:
-			return '9';
-		case 10:
-			return 'a';
-		case 11:
-			return 'b';
-		case 12:
-			return 'c';
-		case 13:
-			return 'd';
-		case 14:
-			return 'e';
-		case 15:
-			return 'f';
-		default:
-			return (char)NULL;
-	}
-}
 
 void helper(ofstream *outputFile, int subHeight, int subWidth, int originY, int originX) {
 	*outputFile << "static Gfx " + baseFileName << "_" << originY << "_" << originX << "_C_dummy_aligner[] = { gsSPEndDisplayList() };" << endl;
@@ -93,93 +42,6 @@ void helper(ofstream *outputFile, int subHeight, int subWidth, int originY, int 
 		}
 	}
 	*outputFile << endl << "};\n" << endl;
-}
-
-void convertPixelData()
-{
-	// does the input image has an alpha channel
-	bool hasAlpha = true;
-	
-	if (png_get_color_type(myLibPngHelper.pngPointer, myLibPngHelper.infoPointer) == PNG_COLOR_TYPE_RGB) {
-		cout << "No alpha channel in image." << endl;
-		hasAlpha = false;
-	} else {
-		cout << "There is an alpha channel in the image." << endl;
-	}
-
-
-	// allocate rgbValues array
-	int rgbValuesSize = myLibPngHelper.width*myLibPngHelper.height;
-	rgbValues = new rgb[rgbValuesSize];
-
-	// fill up the rgbValues array
-	for(int iHeight = 0; iHeight < myLibPngHelper.height; ++iHeight) {
-		png_byte* row = myLibPngHelper.row_pointers[iHeight];
-		for (int jWidth = 0; jWidth < myLibPngHelper.width; jWidth++) {
-			png_byte* ptr = hasAlpha ? &(row[jWidth*4]) : &(row[jWidth*3]);
-			int rgbValuesPosition = iHeight*myLibPngHelper.width + jWidth;
-			int maxval = pow(2, myLibPngHelper.bitDepth);
-			int max8BitValue = 31;
-
-			//first the red
-			double colorValue = ptr[0];
-			double calculatedValue = (colorValue/maxval)*max8BitValue;
-			rgbValues[rgbValuesPosition].r = new bitset<5>(calculatedValue);
-			
-			// now for the green
-			colorValue = ptr[1];		
-			calculatedValue = (colorValue/maxval)*max8BitValue;
-			rgbValues[rgbValuesPosition].g = new bitset<5>(calculatedValue);
-			
-			// and, finally, the blue
-			colorValue = ptr[2];		
-			calculatedValue = (colorValue/maxval)*max8BitValue;
-			rgbValues[rgbValuesPosition].b = new bitset<5>(calculatedValue);
-
-			// OH! don't forget the alpha
-			if(hasAlpha) {
-				rgbValues[rgbValuesPosition].a = ptr[3] == 255? new bitset<1>(1) : new bitset<1>(0);
-			} else {
-				rgbValues[rgbValuesPosition].a = new bitset<1>(1);
-			}
-
-			// now make the sample bitset
-			string redStr = (*rgbValues[rgbValuesPosition].r).to_string();
-			string greenStr = (*rgbValues[rgbValuesPosition].g).to_string();
-			string blueStr = (*rgbValues[rgbValuesPosition].b).to_string();
-			string alphaStr = (*rgbValues[rgbValuesPosition].a).to_string();
-			rgbValues[rgbValuesPosition].sample = new bitset<16>(redStr+greenStr+blueStr+alphaStr);
-			// if(ptr[3] == 0) rgbValues[rgbValuesPosition].sample = new bitset<16>(0xFFFE);
-
-			// now for the final steps in conversion
-			// so far we have a 16bit sample value that needs broken up into hex
-			int first, second, third, fourth;
-			first = ((*rgbValues[rgbValuesPosition].sample)>>12).to_ulong();
-			second = (((*rgbValues[rgbValuesPosition].sample)<<4)>>12).to_ulong();
-			third = (((*rgbValues[rgbValuesPosition].sample)<<8)>>12).to_ulong();
-			fourth = (((*rgbValues[rgbValuesPosition].sample)<<12)>>12).to_ulong();
-
-			rgbValues[rgbValuesPosition].n64Format = new char[4];
-			rgbValues[rgbValuesPosition].n64Format[0] = toHexNib(first);
-			rgbValues[rgbValuesPosition].n64Format[1] = toHexNib(second);
-			rgbValues[rgbValuesPosition].n64Format[2] = toHexNib(third);
-			rgbValues[rgbValuesPosition].n64Format[3] = toHexNib(fourth);
-
-			// if(iHeight == 9) {
-				// if(jWidth == 68) {
-					// cout << ptr[0]/1 << " " << ptr[1]/1 << " " << ptr[2]/1 << " " << ptr[3]/1 << endl;
-					// cout << rgbValues[rgbValuesPosition].n64Format << endl;
-				// }
-			// }
-
-			// clean it up!
-			delete rgbValues[rgbValuesPosition].r;
-			delete rgbValues[rgbValuesPosition].g;
-			delete rgbValues[rgbValuesPosition].b;
-			delete rgbValues[rgbValuesPosition].a;
-			delete rgbValues[rgbValuesPosition].sample;
-		}
-	}
 }
 
 // static Vtx shade_vtx[] =  {
@@ -235,7 +97,7 @@ void fullScreenImage(ofstream *outputFile)
 			*outputFile << "\t" + baseFileName << "_" << i * chunk_size << "_" << j * chunk_size << "_vtx," << endl;
 		}
 	}
-	*outputFile << "};" << endl;
+	*outputFile << "};" << endl << endl;
 
 	// *outputFile << "static Vtx *" + baseFileName << "_vtx[" << num_columns * num_rows << "] = {" << endl;
 	// for(int i = 0; i < num_rows; ++i) {
@@ -325,8 +187,12 @@ int main(int argc, char **argv)
 		return 0;
 	}
 
-	// that worked, so convert the pixels into the 5/5/5/1 format
-	convertPixelData();
+	// allocate rgbValues array
+	int rgbValuesSize = myLibPngHelper.width*myLibPngHelper.height;
+	rgbValues = new rgb[rgbValuesSize];
+
+	// convert the pixels into the 5/5/5/1 format
+	PixelFormatter::convertPixelData(myLibPngHelper.rowPointers, myLibPngHelper.width, myLibPngHelper.height, myLibPngHelper.bitDepth, myLibPngHelper.hasAlpha(), rgbValues);
 
 	// generate a name for the output file if it isn't supplied
 	char *outName;
@@ -349,7 +215,7 @@ int main(int argc, char **argv)
 	//now cycle through the rgbValues array and print to file
 
 	if(fullRes)	fullScreenImage(&outputFile);
-	
+
 	delete[] rgbValues;
 	
 	outputFile.close();
