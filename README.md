@@ -6,10 +6,13 @@ To build the project type:
 ```
 $ make
 ```
-To test it out with a PNG:
-*Currently only fullscreen conversion is possible (320x240). Fix coming very soon.*
+To test it out with a full screen PNG (320x240):
 ```
 $ ./png2c full_screen_image.png -f
+```
+To convert and standard texture:
+```
+$ ./png2c my_texture.png
 ```
 
 ## Dependencies
