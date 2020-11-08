@@ -10,7 +10,7 @@ To test it out with a full screen PNG (320x240):
 ```
 $ ./png2c full_screen_image.png -f
 ```
-To convert and standard texture:
+To convert any standard texture:
 ```
 $ ./png2c my_texture.png
 ```
