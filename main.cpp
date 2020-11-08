@@ -2,7 +2,7 @@
  * Copyright 2016-2020 Jason Lambert.
  */
 
-const char *version_number = "2.0";
+const char *versionNumber = "2.0";
 
 // fancy command line argument parser 
 #include <tclap/CmdLine.h>
@@ -23,6 +23,7 @@ char *buffer;
 rgb *rgbValues;
 string inputFileName;
 string outputFileName;
+int zDepth;
 
 LibPngHelper myLibPngHelper = LibPngHelper();
 
@@ -31,28 +32,36 @@ LibPngHelper myLibPngHelper = LibPngHelper();
 bool setupTclap(int argc, char **argv) {
 	bool fullRes = false;
 	try {  
-		TCLAP::CmdLine cmd("Get 'N Or Get Out", ' ',version_number);
+		TCLAP::CmdLine cmd("Get 'N Or Get Out", ' ', versionNumber);
 
-		TCLAP::SwitchArg fullResSwitch("f","fullres","Generate data for full screen background.", cmd, false);
+		TCLAP::SwitchArg fullResSwitch("f", "fullres", "Generate data for full screen background.", cmd, false);
 
-		TCLAP::ValueArg<std::string> outObjectArg("o","outfile","Name of output bitmap.",false,"","string");
-		cmd.add( outObjectArg );
+		TCLAP::ValueArg<string> outObjectArg("o", "outfile", "Name of output bitmap.", false, "", "string");
+		cmd.add(outObjectArg);
 
-		TCLAP::UnlabeledValueArg<std::string>  inFile("in","","","","string");
-		cmd.add( inFile );
+		// TCLAP::ValueArg<float> zDepthArg("z", "zdepth", "Z-Depth of full screen image.", false, 0, "string");
+		// cmd.add(zDepthArg);
+
+		TCLAP::UnlabeledValueArg<string>  inFileArg("in", "", "", "", "string");
+		cmd.add(inFileArg);
 		
 		cmd.parse( argc, argv );
-		outputFileName = outObjectArg.getValue();
-		inputFileName = inFile.getValue();
 
+		outputFileName = outObjectArg.getValue();
+		inputFileName = inFileArg.getValue();
+		// zDepth = zDepthArg.getValue();
+		zDepth = 0; // manually setting 0 here because TCLAP isn't doing what I'm expecting when I drag and drop.. fix later
 		fullRes = fullResSwitch.getValue();
 
-	} catch (TCLAP::ArgException &e)  // catch any exceptions
-	{ std::cerr << "error: " << e.error() << " for arg " << e.argId() << std::endl; }
+	} catch (TCLAP::ArgException &e) {
+		std::cerr << "error: " << e.error() << " for arg " << e.argId() << std::endl;
+	}
 
 	return fullRes;
 }
 
+// when an output texture name/file name is not provided,
+// this function is used to generate one from the input file
 string stripFileName(string inputFileName) {
 	// remove path from filename
 	string temporaryInputFileNameStringObject(inputFileName);
@@ -86,15 +95,15 @@ int main(int argc, char **argv) {
 	PixelWriter myPixelWriter = PixelWriter(textureName, myLibPngHelper.width, myLibPngHelper.height);
 
 	// generate a name for the output file if it isn't supplied
-	char *outName;
+	char *outputFileNameCStr;
 	if(outputFileName == "") {
-		outName = (char*)(textureName + ".h").c_str();
+		outputFileNameCStr = (char*)(textureName + ".h").c_str();
 	} else {
-		outName = (char*)outputFileName.c_str();
+		outputFileNameCStr = (char*)outputFileName.c_str();
 	}
 
 	// prepare the output file for writing
-	ofstream outputFile(outName, ios::out);
+	ofstream outputFile(outputFileNameCStr, ios::out);
 	
 	// put some useful information at the top
 	myPixelWriter.writeOutputFileHeader(outputFile, fullRes);
@@ -110,7 +119,7 @@ int main(int argc, char **argv) {
 			cout << "Full screen conversion requires image dimensions of 320 x 240." << endl;
 			exit(EXIT_FAILURE);
 		}
-		myPixelWriter.writeFullScreenImage(rgbValues, &outputFile);
+		myPixelWriter.writeFullScreenImage(rgbValues, &outputFile, zDepth);
 	} else {
 		myPixelWriter.writeStandardImage(rgbValues, &outputFile);
 		cout << "got here" << endl;

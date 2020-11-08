@@ -19,7 +19,7 @@ class PixelWriter {
     public:
 		PixelWriter(string textureName, int textureWidth, int textureHeight);
 
-		void writeFullScreenImage(rgb *rgbValues, ofstream *outputFile);
+		void writeFullScreenImage(rgb *rgbValues, ofstream *outputFile, int zDepth);
 		void writeStandardImage(rgb *rgbValues, ofstream *outputFile);
 
 		bool isFullScreenImage();

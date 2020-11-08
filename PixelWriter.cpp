@@ -46,9 +46,8 @@ void PixelWriter::writeStandardImage(rgb *rgbValues, ofstream *outputFile) {
 	writePixelRange(rgbValues, outputFile, textureHeight, textureWidth, 0, 0);
 }
 
-void PixelWriter::writeFullScreenImage(rgb *rgbValues, ofstream *outputFile) {
-	int z_depth = -5;
-	
+void PixelWriter::writeFullScreenImage(rgb *rgbValues, ofstream *outputFile, int zDepth) {
+
 	// we'll be breaking the image up into 32x32 pixel chunks
 	int chunk_size = 32;
 	int num_rows = (1.0 * fullScreenHeight)/chunk_size + 0.5, num_columns = fullScreenWidth/chunk_size; //fix this later.. if you feel like it
@@ -57,10 +56,10 @@ void PixelWriter::writeFullScreenImage(rgb *rgbValues, ofstream *outputFile) {
 	// for(int i = 0; i < num_rows; ++i) {
 		// for(int j = 0; j < num_columns; ++j) {
 			// // *outputFile << "static Vtx " + textureName << "_" << i * chunk_size << "_" << j * chunk_size << "_vtx[] = {" << endl;  //original
-			// *outputFile << "\t{ " << j * chunk_size - (fullScreenWidth / 2) << ", " << i * chunk_size + (fullScreenHeight / 2) << ", " << z_depth << ", 0, 0 << 6, 0 << 6, 0, 0, 0, 0 }," << endl;
-			// *outputFile << "\t{ " << j * chunk_size + chunk_size - (fullScreenWidth / 2) << ", " << i * chunk_size + (fullScreenHeight / 2) << ", " << z_depth << ", 0, " << chunk_size << " << 6, 0 << 6, 0, 0, 0, 0 }," << endl;
-			// *outputFile << "\t{ " << j * chunk_size + chunk_size - (fullScreenWidth / 2) << ", " << i * chunk_size - chunk_size + (fullScreenHeight / 2) << ", " << z_depth << ", 0, " << chunk_size << " << 6, " << chunk_size << " << 6, 0, 0, 0, 0 }," << endl;
-			// *outputFile << "\t{ " << j * chunk_size - (fullScreenWidth / 2) << ", " << i * chunk_size - chunk_size + (fullScreenHeight / 2) << ", " << z_depth << ", 0, 0 << 6, " << chunk_size << " << 6, 0, 0, 0, 0 }," << endl;
+			// *outputFile << "\t{ " << j * chunk_size - (fullScreenWidth / 2) << ", " << i * chunk_size + (fullScreenHeight / 2) << ", " << zDepth << ", 0, 0 << 6, 0 << 6, 0, 0, 0, 0 }," << endl;
+			// *outputFile << "\t{ " << j * chunk_size + chunk_size - (fullScreenWidth / 2) << ", " << i * chunk_size + (fullScreenHeight / 2) << ", " << zDepth << ", 0, " << chunk_size << " << 6, 0 << 6, 0, 0, 0, 0 }," << endl;
+			// *outputFile << "\t{ " << j * chunk_size + chunk_size - (fullScreenWidth / 2) << ", " << i * chunk_size - chunk_size + (fullScreenHeight / 2) << ", " << zDepth << ", 0, " << chunk_size << " << 6, " << chunk_size << " << 6, 0, 0, 0, 0 }," << endl;
+			// *outputFile << "\t{ " << j * chunk_size - (fullScreenWidth / 2) << ", " << i * chunk_size - chunk_size + (fullScreenHeight / 2) << ", " << zDepth << ", 0, 0 << 6, " << chunk_size << " << 6, 0, 0, 0, 0 }," << endl;
 		// }
 	// }
 	// *outputFile << "};" << endl;
@@ -68,14 +67,14 @@ void PixelWriter::writeFullScreenImage(rgb *rgbValues, ofstream *outputFile) {
 	for(int i = 0; i < num_rows; ++i) {
 		for(int j = 0; j < num_columns; ++j) {
 			*outputFile << "static Vtx " + textureName << "_" << i * chunk_size << "_" << j * chunk_size << "_vtx[] = {" << endl;  //original
-			*outputFile << "\t{ " << j * chunk_size - (fullScreenWidth / 2) << ", " << 0 - 0 - i * chunk_size + (fullScreenHeight / 2) << ", " << z_depth << ", 0, 0 << 6, 0 << 6, 0, 0, 0, 0 }," << endl;
-			*outputFile << "\t{ " << j * chunk_size + chunk_size - (fullScreenWidth / 2) << ", " << 0 - i * chunk_size + (fullScreenHeight / 2) << ", " << z_depth << ", 0, " << chunk_size << " << 6, 0 << 6, 0, 0, 0, 0 }," << endl;
+			*outputFile << "\t{ " << j * chunk_size - (fullScreenWidth / 2) << ", " << 0 - 0 - i * chunk_size + (fullScreenHeight / 2) << ", " << zDepth << ", 0, 0 << 6, 0 << 6, 0, 0, 0, 0 }," << endl;
+			*outputFile << "\t{ " << j * chunk_size + chunk_size - (fullScreenWidth / 2) << ", " << 0 - i * chunk_size + (fullScreenHeight / 2) << ", " << zDepth << ", 0, " << chunk_size << " << 6, 0 << 6, 0, 0, 0, 0 }," << endl;
 			if(i+1 == num_rows) {
-				*outputFile << "\t{ " << j * chunk_size + chunk_size - (fullScreenWidth / 2) << ", " << 0 - i * chunk_size - chunk_size / 2 + (fullScreenHeight / 2) << ", " << z_depth << ", 0, " << chunk_size << " << 6, " << chunk_size / 2 << " << 6, 0, 0, 0, 0 }," << endl;
-				*outputFile << "\t{ " << j * chunk_size - (fullScreenWidth / 2) << ", " << 0 - i * chunk_size - chunk_size / 2 + (fullScreenHeight / 2) << ", " << z_depth << ", 0, 0 << 6, " << chunk_size / 2 << " << 6, 0, 0, 0, 0 }" << endl;
+				*outputFile << "\t{ " << j * chunk_size + chunk_size - (fullScreenWidth / 2) << ", " << 0 - i * chunk_size - chunk_size / 2 + (fullScreenHeight / 2) << ", " << zDepth << ", 0, " << chunk_size << " << 6, " << chunk_size / 2 << " << 6, 0, 0, 0, 0 }," << endl;
+				*outputFile << "\t{ " << j * chunk_size - (fullScreenWidth / 2) << ", " << 0 - i * chunk_size - chunk_size / 2 + (fullScreenHeight / 2) << ", " << zDepth << ", 0, 0 << 6, " << chunk_size / 2 << " << 6, 0, 0, 0, 0 }" << endl;
 			} else {
-				*outputFile << "\t{ " << j * chunk_size + chunk_size - (fullScreenWidth / 2) << ", " << 0 - i * chunk_size - chunk_size + (fullScreenHeight / 2) << ", " << z_depth << ", 0, " << chunk_size << " << 6, " << chunk_size << " << 6, 0, 0, 0, 0 }," << endl;
-				*outputFile << "\t{ " << j * chunk_size - (fullScreenWidth / 2) << ", " << 0 - i * chunk_size - chunk_size + (fullScreenHeight / 2) << ", " << z_depth << ", 0, 0 << 6, " << chunk_size << " << 6, 0, 0, 0, 0 }" << endl;
+				*outputFile << "\t{ " << j * chunk_size + chunk_size - (fullScreenWidth / 2) << ", " << 0 - i * chunk_size - chunk_size + (fullScreenHeight / 2) << ", " << zDepth << ", 0, " << chunk_size << " << 6, " << chunk_size << " << 6, 0, 0, 0, 0 }," << endl;
+				*outputFile << "\t{ " << j * chunk_size - (fullScreenWidth / 2) << ", " << 0 - i * chunk_size - chunk_size + (fullScreenHeight / 2) << ", " << zDepth << ", 0, 0 << 6, " << chunk_size << " << 6, 0, 0, 0, 0 }" << endl;
 			}
 			*outputFile << "};" << endl << endl;
 		}
@@ -93,10 +92,10 @@ void PixelWriter::writeFullScreenImage(rgb *rgbValues, ofstream *outputFile) {
 		// for(int j = 0; j < num_columns; ++j) {
 			// // *outputFile << "static Vtx " + textureName << "_" << i * chunk_size << "_" << j * chunk_size << "_vtx[] = {" << endl;  //original
 			// *outputFile << "\t(Vtx []){" << endl;
-			// *outputFile << "\t\t{ " << j * chunk_size - (fullScreenWidth / 2) << ", " << i * chunk_size + (fullScreenHeight / 2) << ", " << z_depth << ", 0, 0 << 6, 0 << 6, 0, 0, 0, 0 }," << endl;
-			// *outputFile << "\t\t{ " << j * chunk_size + chunk_size - (fullScreenWidth / 2) << ", " << i * chunk_size + (fullScreenHeight / 2) << ", " << z_depth << ", 0, " << chunk_size << " << 6, 0 << 6, 0, 0, 0, 0 }," << endl;
-			// *outputFile << "\t\t{ " << j * chunk_size + chunk_size - (fullScreenWidth / 2) << ", " << i * chunk_size - chunk_size + (fullScreenHeight / 2) << ", " << z_depth << ", 0, " << chunk_size << " << 6, " << chunk_size << " << 6, 0, 0, 0, 0 }," << endl;
-			// *outputFile << "\t\t{ " << j * chunk_size - (fullScreenWidth / 2) << ", " << i * chunk_size - chunk_size + (fullScreenHeight / 2) << ", " << z_depth << ", 0, 0 << 6, " << chunk_size << " << 6, 0, 0, 0, 0 }" << endl;
+			// *outputFile << "\t\t{ " << j * chunk_size - (fullScreenWidth / 2) << ", " << i * chunk_size + (fullScreenHeight / 2) << ", " << zDepth << ", 0, 0 << 6, 0 << 6, 0, 0, 0, 0 }," << endl;
+			// *outputFile << "\t\t{ " << j * chunk_size + chunk_size - (fullScreenWidth / 2) << ", " << i * chunk_size + (fullScreenHeight / 2) << ", " << zDepth << ", 0, " << chunk_size << " << 6, 0 << 6, 0, 0, 0, 0 }," << endl;
+			// *outputFile << "\t\t{ " << j * chunk_size + chunk_size - (fullScreenWidth / 2) << ", " << i * chunk_size - chunk_size + (fullScreenHeight / 2) << ", " << zDepth << ", 0, " << chunk_size << " << 6, " << chunk_size << " << 6, 0, 0, 0, 0 }," << endl;
+			// *outputFile << "\t\t{ " << j * chunk_size - (fullScreenWidth / 2) << ", " << i * chunk_size - chunk_size + (fullScreenHeight / 2) << ", " << zDepth << ", 0, 0 << 6, " << chunk_size << " << 6, 0, 0, 0, 0 }" << endl;
 			// *outputFile << "\t}," << endl;
 		// }
 	// }
