@@ -1,4 +1,4 @@
-# convert2h
+# png2c
 A very straightforward CLI tool to convert images to libultra compatible texure header files.
 
 ## GNU Compiler Supported
