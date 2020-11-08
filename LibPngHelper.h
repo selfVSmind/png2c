@@ -1,10 +1,10 @@
-#ifndef MYLIBPNGHELPER_H
-#define MYLIBPNGHELPER_H
+#ifndef LIBPNGHELPER_H
+#define LIBPNGHELPER_H
 
 #include <png.h>
 #include <string>
 
-// this is self-instantiating because only one should exist at a time
+// only one instance at a time please
 class LibPngHelper {
     public:
         png_byte colorType;
@@ -18,6 +18,6 @@ class LibPngHelper {
         LibPngHelper();
         std::string readInputPngFile(char* fileName);
         bool hasAlpha();
-} myLibPngHelper;
+};
 
 #endif

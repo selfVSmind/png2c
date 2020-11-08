@@ -24,6 +24,8 @@ string baseFileName;
 string outputFileName;
 string inputFileName;
 
+LibPngHelper myLibPngHelper = LibPngHelper();
+
 void helper(ofstream *outputFile, int subHeight, int subWidth, int originY, int originX) {
 	*outputFile << "static Gfx " + baseFileName << "_" << originY << "_" << originX << "_C_dummy_aligner[] = { gsSPEndDisplayList() };" << endl;
 	*outputFile << "static unsigned short " + baseFileName << "_" << originY << "_" << originX << "[] = {" << endl;
